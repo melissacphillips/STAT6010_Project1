@@ -1,5 +1,5 @@
 # Activity: STAT 6021 Project 1 - Diamonds
-# Team Members: Brigitte Hogan, Sherry, ...
+# Team Members: Brigitte Hogan (bwh5v), Sherry Kausch, Melissa Phillips, Jason Tiezzi
 # Source of Data: BlueNile.com
 # Deadline: Friday, July 19th @0900
 
@@ -8,7 +8,7 @@
 # - Clear central analytic goals and/or questions to answer 
 #   (the more interesting/ challenging/ practical, the better)
 # - a "substantial" computational component for the analysis
-# - analytic methods developed in this course.
+# - analytic methods developed in this course
 
 # The deliverables are
 # 1. Report (.doc, .docx, or .pdf)
