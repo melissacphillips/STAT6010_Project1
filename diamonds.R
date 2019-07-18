@@ -71,12 +71,13 @@ contrasts(diam$color) # how color will be coded in lm
 
 # re-leveling cut
 # actual order: (worst) Good < Very Good < Ideal < Astor Ideal (good)
-#levels = c("Good", "Very Good", "Ideal", "Astor Ideal"))
-# our focus is on "Astor Ideal vs "Ideal"
-# we move "Ideal" into 1st position to use as a reference point for comparison
+# our focus is on "Astor Ideal vs "Ideal" so we move "Ideal" into 1st position to use as a reference point for comparison
 diam$cut <- factor(diam$cut, 
                    levels = c("Ideal", "Good", "Very Good", "Astor Ideal"))
 contrasts(diam$cut) # how cut will be coded in lm
+# save actual order for plotting
+diam$cut_plotting <- factor(diam$cut, 
+                        levels = c("Good", "Very Good", "Ideal", "Astor Ideal"))
 
 #__________________#############################################################
 # DESCRIPTIVE STATS ####
@@ -104,13 +105,18 @@ table(diam$color) # few poor color diamonds, but otherwise even distribution
 ## descriptive plots ####
 
 diam$freq <- 1 # creates count variable for plotting
+diam$cut_plotting2 <- as.character(diam$cut) # another plotting option
+diam$cut_plotting2 <- replace(diam$cut_plotting2, diam$cut_plotting2 == "Astor Ideal", "AI")
+diam$cut_plotting2 <- factor(diam$cut_plotting2, 
+                             levels = c("Good", "Very Good", "Ideal", "AI"))
 # RColorBrewer::display.brewer.all() # color palettes
 mapColor <- hcl.colors(8, palette="Blues")
 
 # Based on number of values
 treemap(diam,
-        index=c("cut","color","clarity"),
+        index=c("cut_plotting2","color","clarity"),
         vSize="freq", 
+        title="",
         type="categorical", vColor="color",
         # graphic options
         palette = mapColor,
@@ -158,22 +164,42 @@ hist(diam$price)
 hist(diam$logPrice) 
 # the log transformation has improved skew in data, but still some R skew
 hist(sqrt(diam$price + 0.5)) # no help
+diam %>% ggplot(aes(price)) + 
+  geom_histogram(bins = 30) +
+  ylab("Number of Diamonds") +
+  xlab("Price")
+diam %>% ggplot(aes(logPrice)) + 
+  geom_histogram(bins = 30) +
+  ylab("Number of Diamonds") +
+  xlab("log(Price)")
 
 # 1. Carat (continuous) ----
 hist(diam$carat)
 hist(diam$logCarat)
-diam %>% ggplot(aes(carat)) + geom_histogram(bins = 30)
-diam %>% ggplot(aes(logCarat)) + geom_histogram(bins = 30)
+diam %>% ggplot(aes(carat)) + 
+  geom_histogram(bins = 30) +
+  ylab("Number of Diamonds") +
+  xlab("Carat")
+
+diam %>% ggplot(aes(logCarat)) + 
+  geom_histogram(bins = 30) +
+  ylab("Number of Diamonds") +
+  xlab("log(Carat)")
 
 # 2. Clarity (discrete, 8 levels) ----
-diam %>% ggplot(aes(clarity)) + geom_bar()
+diam %>% ggplot(aes(clarity)) + geom_bar() + 
+  ylab("Number of Diamonds") +
+  xlab("Clarity")
 
 # 3. Color (discrete, 7 levels) ----
-diam %>% ggplot(aes(color)) + geom_bar()
+diam %>% ggplot(aes(color)) + geom_bar() + 
+  ylab("Number of Diamonds") +
+  xlab("Color")
 
 # 4. Cut (discrete, 4 levels) ----
-diam %>% ggplot(aes(cut)) + geom_bar()
-
+diam %>% ggplot(aes(cut_plotting)) + geom_bar() + 
+  ylab("Number of Diamonds") +
+  xlab("Cut")
 
 ## Interactions
 # All pair plots ----
@@ -219,9 +245,32 @@ aov(mod1)
 summary(mod1)
 
 
+
+
+
+
 # make model without astor ideal and with astor ideal and compare??
+diam$cutNoAstor <- as.character(diam$cut)
+diam$cutNoAstor <- replace(diam$cutNoAstor, diam$cutNoAstor=="Astor Ideal", "Ideal")
+diam$cutNoAstor <- factor(diam$cutNoAstor,
+                          levels = c("Ideal", "Good", "Very Good"))
 
-
+mod_noAst <- lm(logPrice ~ logCarat + clarity + color + cutNoAstor, data = diam)
+summary(mod1)
+summary(mod_noAst)
+#                       Estimate Std. Error t value Pr(>|t|)  
+# cutGood             -0.0939674  0.0006377 -147.35   <2e-16 ***
+# cutVery Good        -0.0740186  0.0003550 -208.48   <2e-16 ***
+# cutAstor Ideal       0.0357356  0.0012574   28.42   <2e-16 ***
+# ----
+# cutNoAstorGood      -0.0949383  0.0006380 -148.81   <2e-16 ***
+# cutNoAstorVery Good -0.0749808  0.0003541 -211.75   <2e-16 ***
+anova(mod1)
+anova(mod_noAst)
+#                Df Sum Sq Mean Sq  F value    Pr(>F)  
+# cut             3    298      99    19226 < 2.2e-16 ***
+# cutNoAstor      2    294     147    28327 < 2.2e-16 ***
+anova(mod_noAst, mod1) # smallest to largest
 
 #__________________#############################################################
 # x vs y Plots ----
