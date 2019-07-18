@@ -38,6 +38,8 @@ library(here) # for setting working directory
 library(tidyverse) # for ggplot2 and piping
 library(GGally) # for interaction plots
 library(treemap) # for plotting
+library(MASS)
+library(car)
 
 # to get p-value of model without "peeking" at t-tests
 getPmodel <- function (modelobject) {
