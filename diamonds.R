@@ -34,84 +34,151 @@
 
 #__________________###########################################################
 # IMPORT LIBRARIES ####
-library(here)
-library(tidyverse)
-library(GGally)
+library(here) # for setting working directory
+library(tidyverse) # for ggplot2 and piping
+library(GGally) # for interaction plots
+library(treemap) # for plotting
+
+# to get p-value of model without "peeking" at t-tests
+getPmodel <- function (modelobject) {
+  if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
+  f <- summary(modelobject)$fstatistic
+  p <- pf(f[1],f[2],f[3],lower.tail=F)
+  attributes(p) <- NULL
+  return(p)
+}
 
 #__________________############################################################
 # READ IN DATA ####
 diam <- read.csv("clean_diamond_data.csv")
+head(diam)
+
+#__________________#############################################################
+# CLEAN DATA ####
 str(diam)
+
+# Re-leveling clarity
+# actual order: (worst) SI2 < SI1 < VS2 < VS1 < VVS2 < VVS1 < IF < FL (best)
+diam$clarity <- factor(diam$clarity,
+                       levels = c("SI2","SI1","VS2","VS1",
+                                  "VVS2","VVS1","IF","FL"))
+contrasts(diam$clarity) # how clarity will be coded in lm
+
+# Re-leveling color
+# actual order: J (worst) to D (best)
+diam$color <- factor(diam$color, levels=c("J","I","H","G","F","E","D"))
+contrasts(diam$color) # how color will be coded in lm
+
+# re-leveling cut
+# actual order: (worst) Good < Very Good < Ideal < Astor Ideal (good)
+#levels = c("Good", "Very Good", "Ideal", "Astor Ideal"))
+# our focus is on "Astor Ideal vs "Ideal"
+# we move "Ideal" into 1st position to use as a reference point for comparison
+diam$cut <- factor(diam$cut, 
+                   levels = c("Ideal", "Good", "Very Good", "Astor Ideal"))
+contrasts(diam$cut) # how cut will be coded in lm
 
 #__________________#############################################################
 # DESCRIPTIVE STATS ####
 summary(diam)
 
-## Divide Into Groups ====
-diam_big <- diam %>% filter(carat >= 15)
-diam_med <- diam %>% filter(5 <= carat & carat < 15)
-diam_sml <- diam %>% filter(carat < 5)
-hist(diam_sml$carat)
-hist(diam_med$carat)
-hist(diam_big$carat)
+# y (dependent)
+range(diam$price) # large range from 229 to 2,000,000+
+mean(diam$price) # mean of $5540
+quantile(diam$price) %>% plot()
 
-## Plots ====
+# carat - continuous
+range(diam$carat) # large range from 0.23 to 20.45
+mean(diam$carat) # 0.76
+quantile((diam$carat)) %>% plot()
 
-# All pair plots ----
-ggpairs(diam)
+# clarity - discrete
+table(diam$clarity) # fewer high-clarity diamonds
 
-# Dependent variable ----
-diam %>% ggplot(aes(price)) + geom_histogram(bins=30)
-hist(diam$price)
-range(diam$price)
-# data is highly right-skewed, but no zeros
+# cut - discrete
+table(diam$cut) # most diamonds are ideal, followed by Very Good & Good
 
-# 1. Transformation ----
-# attempt log transformation
+# color - discrete
+table(diam$color) # few poor color diamonds, but otherwise even distribution
+
+## descriptive plots ####
+
+diam$freq <- 1 # creates count variable for plotting
+# RColorBrewer::display.brewer.all() # color palettes
+mapColor <- hcl.colors(8, palette="Blues")
+
+# Based on number of values
+treemap(diam,
+        index=c("cut","color","clarity"),
+        vSize="freq", 
+        type="categorical", vColor="color",
+        # graphic options
+        palette = mapColor,
+        fontsize.labels = c(26, 20, 8), bg.labels=0, 
+        fontface.labels = c("bold", "bold", "plain"),
+        fontcolor.labels = c("red3", "gray40", "gray10"),
+        border.col = c("black", "black", "white"),
+        border.lwds = c(7,3,1))
+
+# Based on Price (trickier)
+treemap(diam, 
+        index=c("cut","color"),      # how to divide up data
+        vSize="freq",                           # size of rectangles
+        type="manual",                          # manual color palette
+        # graphic options
+        vColor = "price", fun.aggregate="sum", # color is average price
+        palette = "Greens",
+        fontsize.labels = c(26, 20), bg.labels=0, 
+        fontface.labels = c("bold", "bold"),
+        fontcolor.labels = c("red3", "gray40"),
+        border.col = c("black", "black"),
+        border.lwds = c(7,3))
+
+diam %>% group_by(cut) %>% summarize(n=mean(price))
+# Astor Ideal has lowest (!) average price
+
+#__________________#############################################################
+# CHECKING ASSUMPTIONS ####
+diam %>% ggplot(aes(carat, price)) + geom_point() # scatterplot
+# relationship between carat & price does not look linear
+
+# we know from descriptive stats that they both have a wide range and there is very little data in the upper quantile
+# to adjust the scale, we try log-transformation of y value
 diam$logPrice <- log10(diam$price) # log base 10 transform
-hist(diam$logPrice) # # looks more normal, still some R skew
+diam %>% ggplot(aes(carat, logPrice)) + geom_point() # scatterplot
+# scatterplot shows data more evenly distributed in y direction but not x
+# try similar transformation for carat
+diam$logCarat <- log10(diam$carat)
+
+diam %>% ggplot(aes(logCarat, logPrice)) + geom_point() # scatterplot
+# relationship now appears linear and points are more evenly spread
+
+# 1. Price (continuous)
+hist(diam$price)
+hist(diam$logPrice) 
+# the log transformation has improved skew in data, but still some R skew
 hist(sqrt(diam$price + 0.5)) # no help
 
-
-# Independent Variables ----
-
 # 1. Carat (continuous) ----
-table(diam$carat)
 hist(diam$carat)
+hist(diam$logCarat)
 diam %>% ggplot(aes(carat)) + geom_histogram(bins = 30)
-diam$logCarat <- log10(diam$carat)
 diam %>% ggplot(aes(logCarat)) + geom_histogram(bins = 30)
 
 # 2. Clarity (discrete, 8 levels) ----
-# SI2 < SI1 < VS2 < VS1 < VVS2 < VVS1 < IF < FL (best)
-diam$clarity <- factor(diam$clarity,
-                       levels = c("SI2","SI1","VS2","VS1",
-                                  "VVS2","VVS1","IF","FL"))
-table(diam$clarity)
 diam %>% ggplot(aes(clarity)) + geom_bar()
 
 # 3. Color (discrete, 7 levels) ----
-# D best to J worst
-diam$color <- factor(diam$color, levels=c("J","I","H","G","F","E","D"))
-table(diam$color)
 diam %>% ggplot(aes(color)) + geom_bar()
 
-
 # 4. Cut (discrete, 4 levels) ----
-# quality of the cut (Good < Very Good < Ideal < Astor Ideal)
-# reorder levels
-diam$cut <- factor(diam$cut, 
-                   levels = c("Good", "Very Good", "Ideal", "Astor Ideal"))
-table(diam$cut)
 diam %>% ggplot(aes(cut)) + geom_bar()
 
 
-# Independent vs. Dependent ----
-# 1. continuous ----
-diam %>% ggplot(aes(carat, price)) + geom_point()
+## Interactions
+# All pair plots ----
+ggpairs(diam)
 diam %>% ggplot(aes(logCarat, logPrice)) + geom_point()
-
-# 2. discrete ----
 diam %>% ggplot(aes(clarity, logPrice)) +  geom_boxplot()
 diam %>% ggplot(aes(color, logPrice)) +  geom_boxplot()
 diam %>% ggplot(aes(cut, logPrice)) +  geom_boxplot()
@@ -121,15 +188,46 @@ diam %>% ggplot(aes(cut, logPrice)) +  geom_boxplot()
 #__________________#############################################################
 # MODELING ####
 
-# linear model 1
-mod1 <- lm(logPrice ~ carat + clarity + color + cut, data = diam)
-summary(mod1)
-anova(mod1)
-plot(mod1)
-contrasts(diam$clarity)
-contrasts(diam$color)
-contrasts(diam$cut)
+# untransformed data, for reference
+mod0 <- lm(price ~ ., data = diam)
+extern_s_resids0 <- studres(mod0)
+qqnorm(extern_s_resids0)
+qqline(extern_s_resids0)
 
+# Going FWD with model 1
+
+# linear model 1
+mod1 <- lm(logPrice ~ logCarat + clarity + color + cut, data = diam)
+
+extern_s_resids1 <- studres(mod1)
+qqnorm(extern_s_resids1)
+qqline(extern_s_resids1) # still an issue at tails, but much improved
+
+plot(fitted.values(mod1), extern_s_resids1) # looks random
+
+vif(mod1)
+
+summary(mod1)$r.squared # 0.9813
+summary(mod1)$fstatistic # 651,746 huge!
+getPmodel(mod1) # pretty much 0
+
+aov(mod1)
+
+#__________________#############################################################
+# Question: Is Astor Ideal important? ----
+
+summary(mod1)
+
+
+# make model without astor ideal and with astor ideal and compare??
+
+
+
+#__________________#############################################################
+# x vs y Plots ----
+
+
+# some different options
 diam %>%
   ggplot(aes(x=logCarat, y=logPrice, alpha=0.1, color=color, size=cut)) +
   geom_point()
@@ -139,18 +237,10 @@ diam %>%
   scale_color_brewer(type = 'div') + 
   geom_point()
   
-
 diam %>%
   ggplot(aes(x=carat, y=logPrice, alpha=0.1, shape=cut, 
              color=clarity, size=color)) +
   scale_color_brewer(type = 'div') + 
   geom_point()
-
-
-
-# linear model 2
-mod2 <- lm(price ~ carat + clarity + color + cut, data = diam)
-summary(mod2)
-anova(mod2)
 
   
