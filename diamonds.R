@@ -210,6 +210,69 @@ diam %>% ggplot(aes(color, logPrice)) +  geom_boxplot()
 diam %>% ggplot(aes(cut, logPrice)) +  geom_boxplot()
 
 
+#1.  testing for a linear relationship between price and carat.
+
+plot(diam$carat, diam$price)
+
+price_v_carat <- lm(price ~ carat, data = diam)
+
+summary(price_v_carat)
+
+#apply transformation of y to y' = log(y) as previously shown
+#diam$transformed_price <- log10(diam$"price")
+
+#apply transformation of x to x' = log(x)
+#diam$transformed_carat <- log10(diam$"carat")
+
+###### Melissa's Stuff  #####
+
+plot(logCarat, logPrice)
+
+#fitting another linear model to the new data
+tprice_v_tcarat <- lm(logCarat ~ logPrice, data = diam)
+
+summary(tprice_v_tcarat)
+
+#externally studentized residuals
+ext_s_resids <- studres(tprice_v_tcarat)
+
+#qq-plot
+qq_plot1 <- qqnorm(ext_s_resids)
+
+#fitting the complete linear model (previously done as mod1)
+
+#find externally studentized residuals
+ext_s_resids2 <- studres(mod1)
+
+#qq-plot
+qq_plot2 <- qqnorm(ext_s_resids2)
+qq_line2 <- qqline(ext_s_resids2)
+
+#plot looks quite linear suggesting normal distribution of residuals, though there is some indication of fat tails
+
+##another check for normality of residuals - Histogram
+
+x_grid <- seq(min(ext_s_resids2)-.5, max(ext_s_resids2)+.5, by = .01)
+diam <- nrow(my_data) - 7 - 1 # 7 predictors and one intercept
+hist(ext_s_resids2, probability = T, ylim = c(0,.5))
+
+##checking Homoskedastitcity
+
+plot(fitted.values(mod1), ext_s_resids2)
+
+## This plot shoes that the residuals are unpredictable in relation to the fitted values, so the variance is random.
+
+
+#### added variable plots
+
+#av_plots <- avPlots(full_mod)
+
+
+#Hypothesis testing to test H0: B2 = B3 = B4 = B5 = 0
+
+
+anova(tprice_v_tcarat, mod1, data = diam)
+
 
 #__________________#############################################################
 # MODELING ####
